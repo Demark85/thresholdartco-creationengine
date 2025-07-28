@@ -5,6 +5,7 @@ class GeneratedContent(db.Model):
     """Model to store generated MidJourney prompts and Etsy listings"""
     id = db.Column(db.Integer, primary_key=True)
     concept = db.Column(db.Text, nullable=False)
+    concept_id = db.Column(db.Integer, db.ForeignKey('concept.id'), nullable=True)
     midjourney_prompts = db.Column(db.JSON, nullable=False)  # Store as JSON array
     etsy_titles = db.Column(db.JSON, nullable=False)  # Store as JSON array
     etsy_tags = db.Column(db.JSON, nullable=False)  # Store as JSON array
@@ -37,8 +38,7 @@ class Concept(db.Model):
     last_used = db.Column(db.DateTime, default=datetime.utcnow)
     
     # Relationship to generated content
-    generated_contents = db.relationship('GeneratedContent', backref='concept_ref', lazy=True,
-                                       foreign_keys='GeneratedContent.concept')
+    generated_contents = db.relationship('GeneratedContent', backref='concept_ref', lazy=True)
     
     def __repr__(self):
         return f'<Concept {self.id}: {self.text[:50]}... (used {self.usage_count} times)>'

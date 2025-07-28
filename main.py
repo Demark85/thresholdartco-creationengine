@@ -243,13 +243,17 @@ def generate():
         if existing_concept:
             existing_concept.usage_count += 1
             existing_concept.last_used = datetime.utcnow()
+            concept_id = existing_concept.id
         else:
             new_concept = Concept(text=concept)
             db.session.add(new_concept)
+            db.session.flush()  # Get the ID without committing
+            concept_id = new_concept.id
         
         # Save generated content
         generated_content = GeneratedContent(
             concept=concept,
+            concept_id=concept_id,
             midjourney_prompts=midjourney_prompts,
             etsy_titles=etsy_titles,
             etsy_tags=etsy_tags,
