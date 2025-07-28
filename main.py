@@ -1,14 +1,38 @@
 import os
 import logging
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
+from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy.orm import DeclarativeBase
 import random
+from datetime import datetime
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
 
+
+class Base(DeclarativeBase):
+    pass
+
+
+db = SQLAlchemy(model_class=Base)
+
 # Create Flask app
 app = Flask(__name__)
 app.secret_key = os.environ.get("SESSION_SECRET", "dev-secret-key-change-in-production")
+
+# Configure the database
+app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL")
+app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+    "pool_recycle": 300,
+    "pool_pre_ping": True,
+}
+
+# Fallback configuration for development
+if not app.config["SQLALCHEMY_DATABASE_URI"]:
+    app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///thresholdartco.db"
+
+# Initialize the app with the extension
+db.init_app(app)
 
 def generate_midjourney_prompts(concept):
     """Generate 2-3 MidJourney prompts based on the creative concept"""
@@ -211,6 +235,33 @@ def generate():
         etsy_description = generate_etsy_description(concept, etsy_titles)
         pinterest_caption = generate_pinterest_caption(concept)
         
+        # Save to database
+        from models import GeneratedContent, Concept
+        
+        # Check if concept already exists and update usage
+        existing_concept = Concept.query.filter_by(text=concept).first()
+        if existing_concept:
+            existing_concept.usage_count += 1
+            existing_concept.last_used = datetime.utcnow()
+        else:
+            new_concept = Concept(text=concept)
+            db.session.add(new_concept)
+        
+        # Save generated content
+        generated_content = GeneratedContent(
+            concept=concept,
+            midjourney_prompts=midjourney_prompts,
+            etsy_titles=etsy_titles,
+            etsy_tags=etsy_tags,
+            etsy_description=etsy_description,
+            pinterest_caption=pinterest_caption
+        )
+        
+        db.session.add(generated_content)
+        db.session.commit()
+        
+        app.logger.info(f"Saved generated content with ID: {generated_content.id}")
+        
         # Generate placeholder image URLs
         placeholder_images = [
             f"https://picsum.photos/400/500?random={i+1}&blur=1" for i in range(3)
@@ -223,12 +274,101 @@ def generate():
                              etsy_tags=etsy_tags,
                              etsy_description=etsy_description,
                              pinterest_caption=pinterest_caption,
-                             placeholder_images=placeholder_images)
+                             placeholder_images=placeholder_images,
+                             content_id=generated_content.id)
     
     except Exception as e:
         app.logger.error(f"Error generating content: {str(e)}")
+        db.session.rollback()
         flash('An error occurred while generating content. Please try again.', 'error')
         return redirect(url_for('index'))
+
+@app.route('/history')
+def history():
+    """Display a list of all previously generated content"""
+    try:
+        from models import GeneratedContent
+        
+        # Get all generated content, ordered by most recent first
+        generated_contents = GeneratedContent.query.order_by(
+            GeneratedContent.created_at.desc()
+        ).limit(50).all()  # Limit to 50 most recent entries
+        
+        return render_template('history.html', generated_contents=generated_contents)
+    
+    except Exception as e:
+        app.logger.error(f"Error fetching history: {str(e)}")
+        flash('Error loading history. Please try again.', 'error')
+        return redirect(url_for('index'))
+
+@app.route('/view/<int:content_id>')
+def view_content(content_id):
+    """View a specific generated content by ID"""
+    try:
+        from models import GeneratedContent
+        
+        content = GeneratedContent.query.get_or_404(content_id)
+        
+        # Generate placeholder image URLs (same as in generate route)
+        placeholder_images = [
+            f"https://picsum.photos/400/500?random={content_id+i+1}&blur=1" for i in range(3)
+        ]
+        
+        return render_template('results.html',
+                             concept=content.concept,
+                             midjourney_prompts=content.midjourney_prompts,
+                             etsy_titles=content.etsy_titles,
+                             etsy_tags=content.etsy_tags,
+                             etsy_description=content.etsy_description,
+                             pinterest_caption=content.pinterest_caption,
+                             placeholder_images=placeholder_images,
+                             content_id=content.id,
+                             created_at=content.created_at,
+                             is_viewing_saved=True)
+    
+    except Exception as e:
+        app.logger.error(f"Error viewing content {content_id}: {str(e)}")
+        flash('Content not found or error occurred.', 'error')
+        return redirect(url_for('history'))
+
+@app.route('/api/stats')
+def api_stats():
+    """API endpoint to get usage statistics"""
+    try:
+        from models import GeneratedContent, Concept
+        
+        total_generations = GeneratedContent.query.count()
+        unique_concepts = Concept.query.count()
+        most_popular_concepts = Concept.query.order_by(
+            Concept.usage_count.desc()
+        ).limit(5).all()
+        
+        recent_activity = GeneratedContent.query.order_by(
+            GeneratedContent.created_at.desc()
+        ).limit(10).all()
+        
+        return jsonify({
+            'total_generations': total_generations,
+            'unique_concepts': unique_concepts,
+            'most_popular_concepts': [
+                {'text': c.text, 'usage_count': c.usage_count} 
+                for c in most_popular_concepts
+            ],
+            'recent_activity': [
+                {'id': r.id, 'concept': r.concept, 'created_at': r.created_at.isoformat()}
+                for r in recent_activity
+            ]
+        })
+    
+    except Exception as e:
+        app.logger.error(f"Error fetching stats: {str(e)}")
+        return jsonify({'error': 'Failed to fetch statistics'}), 500
+
+# Database initialization
+with app.app_context():
+    # Import models after app and db are configured
+    import models
+    db.create_all()
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
