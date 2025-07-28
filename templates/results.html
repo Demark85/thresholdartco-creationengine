@@ -20,6 +20,9 @@
                 {% endif %}
             </h1>
             <div>
+                <a href="{{ url_for('analytics_dashboard') }}" class="btn btn-outline-info me-2">
+                    <i class="bi bi-graph-up me-2"></i>Analytics
+                </a>
                 <a href="{{ url_for('history') }}" class="btn btn-outline-secondary me-2">
                     <i class="bi bi-clock-history me-2"></i>History
                 </a>
@@ -35,6 +38,16 @@
                 <i class="bi bi-lightbulb me-2"></i>Original Concept:
             </h6>
             <p class="mb-0 fs-5">"{{ concept }}"</p>
+            {% if view_count is defined and view_count > 0 %}
+                <div class="mt-2">
+                    <small class="text-muted">
+                        <i class="bi bi-eye me-1"></i>{{ view_count }} view{{ 's' if view_count != 1 else '' }}
+                        {% if copy_count > 0 %}
+                            | <i class="bi bi-clipboard me-1"></i>{{ copy_count }} cop{{ 'ies' if copy_count != 1 else 'y' }}
+                        {% endif %}
+                    </small>
+                </div>
+            {% endif %}
         </div>
 
         <!-- MidJourney Prompts Section -->
@@ -54,7 +67,10 @@
                                 <h6 class="card-title">Prompt {{ loop.index }}</h6>
                                 <div class="position-relative">
                                     <textarea class="form-control bg-dark text-light border-secondary" rows="4" readonly>{{ prompt }}</textarea>
-                                    <button class="btn btn-sm btn-outline-primary position-absolute top-0 end-0 m-2 copy-btn" data-copy="{{ prompt }}">
+                                    <button class="btn btn-sm btn-outline-primary position-absolute top-0 end-0 m-2 copy-btn" 
+                                            data-copy="{{ prompt }}" 
+                                            data-copy-type="midjourney_prompt" 
+                                            data-content-id="{{ content_id }}">
                                         <i class="bi bi-clipboard"></i>
                                     </button>
                                 </div>
@@ -85,7 +101,10 @@
                         <div class="input-group">
                             <span class="input-group-text bg-secondary border-secondary">{{ loop.index }}</span>
                             <input type="text" class="form-control bg-dark text-light border-secondary" value="{{ title }}" readonly>
-                            <button class="btn btn-outline-success copy-btn" data-copy="{{ title }}">
+                            <button class="btn btn-outline-success copy-btn" 
+                                    data-copy="{{ title }}" 
+                                    data-copy-type="etsy_title" 
+                                    data-content-id="{{ content_id }}">
                                 <i class="bi bi-clipboard"></i>
                             </button>
                         </div>
@@ -105,7 +124,9 @@
                             {% endfor %}
                         </div>
                         <button class="btn btn-sm btn-outline-success position-absolute top-0 end-0 m-2 copy-btn" 
-                                data-copy="{{ etsy_tags | join(', ') }}">
+                                data-copy="{{ etsy_tags | join(', ') }}" 
+                                data-copy-type="etsy_tags" 
+                                data-content-id="{{ content_id }}">
                             <i class="bi bi-clipboard"></i>
                         </button>
                     </div>
@@ -120,7 +141,9 @@
                     <div class="position-relative">
                         <textarea class="form-control bg-dark text-light border-secondary" rows="15" readonly>{{ etsy_description }}</textarea>
                         <button class="btn btn-sm btn-outline-success position-absolute top-0 end-0 m-2 copy-btn" 
-                                data-copy="{{ etsy_description }}">
+                                data-copy="{{ etsy_description }}" 
+                                data-copy-type="etsy_description" 
+                                data-content-id="{{ content_id }}">
                             <i class="bi bi-clipboard"></i>
                         </button>
                     </div>
@@ -139,7 +162,9 @@
                 <div class="position-relative">
                     <textarea class="form-control bg-dark text-light border-secondary" rows="8" readonly>{{ pinterest_caption }}</textarea>
                     <button class="btn btn-sm btn-outline-danger position-absolute top-0 end-0 m-2 copy-btn" 
-                            data-copy="{{ pinterest_caption }}">
+                            data-copy="{{ pinterest_caption }}" 
+                            data-copy-type="pinterest_caption" 
+                            data-content-id="{{ content_id }}">
                         <i class="bi bi-clipboard"></i>
                     </button>
                 </div>

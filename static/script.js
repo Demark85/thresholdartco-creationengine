@@ -8,18 +8,21 @@ document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.copy-btn').forEach(button => {
         button.addEventListener('click', function() {
             const textToCopy = this.getAttribute('data-copy');
+            const copyType = this.getAttribute('data-copy-type') || 'general';
+            const contentId = this.getAttribute('data-content-id');
             
             // Use the modern Clipboard API
             if (navigator.clipboard && window.isSecureContext) {
                 navigator.clipboard.writeText(textToCopy).then(() => {
                     showCopySuccess();
+                    trackCopyEvent(contentId, copyType);
                 }).catch(err => {
                     console.error('Failed to copy text: ', err);
-                    fallbackCopyText(textToCopy);
+                    fallbackCopyText(textToCopy, contentId, copyType);
                 });
             } else {
                 // Fallback for older browsers or non-HTTPS
-                fallbackCopyText(textToCopy);
+                fallbackCopyText(textToCopy, contentId, copyType);
             }
         });
     });
@@ -47,7 +50,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 1000);
     }
 
-    function fallbackCopyText(text) {
+    function fallbackCopyText(text, contentId, copyType) {
         // Create a temporary textarea element
         const textArea = document.createElement('textarea');
         textArea.value = text;
@@ -61,11 +64,31 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             document.execCommand('copy');
             showCopySuccess();
+            trackCopyEvent(contentId, copyType);
         } catch (err) {
             console.error('Failed to copy text: ', err);
             alert('Failed to copy text. Please select and copy manually.');
         } finally {
             document.body.removeChild(textArea);
+        }
+    }
+
+    function trackCopyEvent(contentId, copyType) {
+        // Track copy event via API
+        if (contentId) {
+            fetch('/api/track-copy', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    content_id: parseInt(contentId),
+                    copy_type: copyType
+                })
+            }).catch(err => {
+                console.error('Failed to track copy event:', err);
+                // Fail silently - don't interrupt user experience
+            });
         }
     }
 

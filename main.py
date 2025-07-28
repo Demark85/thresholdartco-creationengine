@@ -4,7 +4,7 @@ from flask import Flask, render_template, request, redirect, url_for, flash, jso
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import DeclarativeBase
 import random
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -212,6 +212,34 @@ This dreamy digital download adds instant charm to any room. Perfect for bedroom
     
     return caption
 
+def track_analytics_event(event_type, content_id=None, concept_id=None, event_data=None):
+    """Helper function to track analytics events"""
+    try:
+        from models import AnalyticsEvent
+        
+        # Get client information
+        ip_address = request.environ.get('HTTP_X_FORWARDED_FOR', request.environ.get('REMOTE_ADDR'))
+        user_agent = request.environ.get('HTTP_USER_AGENT', '')
+        
+        # Create analytics event
+        event = AnalyticsEvent(
+            event_type=event_type,
+            content_id=content_id,
+            concept_id=concept_id,
+            event_data=event_data,
+            ip_address=ip_address[:45] if ip_address else None,  # Truncate if too long
+            user_agent=user_agent[:500] if user_agent else None  # Truncate if too long
+        )
+        
+        db.session.add(event)
+        db.session.commit()
+        app.logger.debug(f"Analytics event tracked: {event_type} for content {content_id}")
+        
+    except Exception as e:
+        app.logger.error(f"Error tracking analytics event: {str(e)}")
+        # Don't fail the main operation if analytics tracking fails
+        db.session.rollback()
+
 @app.route('/')
 def index():
     """Display the main form for inputting creative concepts"""
@@ -266,6 +294,16 @@ def generate():
         
         app.logger.info(f"Saved generated content with ID: {generated_content.id}")
         
+        # Track analytics: content generation
+        track_analytics_event('generate', 
+                            content_id=generated_content.id, 
+                            concept_id=concept_id,
+                            event_data={
+                                'prompt_count': len(midjourney_prompts),
+                                'title_count': len(etsy_titles),
+                                'tag_count': len(etsy_tags)
+                            })
+        
         # Generate placeholder image URLs
         placeholder_images = [
             f"https://picsum.photos/400/500?random={i+1}&blur=1" for i in range(3)
@@ -309,9 +347,24 @@ def history():
 def view_content(content_id):
     """View a specific generated content by ID"""
     try:
-        from models import GeneratedContent
+        from models import GeneratedContent, AnalyticsEvent, Concept
         
         content = GeneratedContent.query.get_or_404(content_id)
+        
+        # Track analytics: content view
+        track_analytics_event('view', content_id=content_id, concept_id=content.concept_id)
+        
+        # Update content view metrics
+        content.view_count += 1
+        content.last_viewed = datetime.utcnow()
+        
+        # Update concept view metrics if linked
+        if content.concept_id:
+            concept = Concept.query.get(content.concept_id)
+            if concept:
+                concept.total_views += 1
+        
+        db.session.commit()
         
         # Generate placeholder image URLs (same as in generate route)
         placeholder_images = [
@@ -328,40 +381,199 @@ def view_content(content_id):
                              placeholder_images=placeholder_images,
                              content_id=content.id,
                              created_at=content.created_at,
-                             is_viewing_saved=True)
+                             is_viewing_saved=True,
+                             view_count=content.view_count,
+                             copy_count=content.copy_count)
     
     except Exception as e:
         app.logger.error(f"Error viewing content {content_id}: {str(e)}")
         flash('Content not found or error occurred.', 'error')
         return redirect(url_for('history'))
 
-@app.route('/api/stats')
-def api_stats():
-    """API endpoint to get usage statistics"""
+@app.route('/analytics')
+def analytics_dashboard():
+    """Display comprehensive analytics dashboard"""
+    try:
+        from models import GeneratedContent, Concept, AnalyticsEvent
+        from sqlalchemy import func
+        
+        # Get basic statistics
+        total_generations = GeneratedContent.query.count()
+        unique_concepts = Concept.query.count()
+        total_views = db.session.query(func.sum(GeneratedContent.view_count)).scalar() or 0
+        total_copies = db.session.query(func.sum(GeneratedContent.copy_count)).scalar() or 0
+        
+        # Get top performing content
+        top_viewed = GeneratedContent.query.order_by(
+            GeneratedContent.view_count.desc()
+        ).limit(10).all()
+        
+        top_copied = GeneratedContent.query.order_by(
+            GeneratedContent.copy_count.desc()
+        ).limit(10).all()
+        
+        # Get popular concepts
+        popular_concepts = Concept.query.order_by(
+            Concept.usage_count.desc()
+        ).limit(10).all()
+        
+        # Get recent analytics events (last 100)
+        recent_events = AnalyticsEvent.query.order_by(
+            AnalyticsEvent.created_at.desc()
+        ).limit(100).all()
+        
+        # Event type summary
+        event_summary = db.session.query(
+            AnalyticsEvent.event_type,
+            func.count(AnalyticsEvent.id).label('count')
+        ).group_by(AnalyticsEvent.event_type).all()
+        
+        return render_template('analytics.html',
+                             total_generations=total_generations,
+                             unique_concepts=unique_concepts,
+                             total_views=total_views,
+                             total_copies=total_copies,
+                             top_viewed=top_viewed,
+                             top_copied=top_copied,
+                             popular_concepts=popular_concepts,
+                             recent_events=recent_events,
+                             event_summary=event_summary)
+    
+    except Exception as e:
+        app.logger.error(f"Error loading analytics dashboard: {str(e)}")
+        flash('Error loading analytics dashboard. Please try again.', 'error')
+        return redirect(url_for('index'))
+
+@app.route('/api/track-copy', methods=['POST'])
+def track_copy_event():
+    """API endpoint to track copy events from frontend"""
     try:
         from models import GeneratedContent, Concept
         
+        data = request.get_json()
+        content_id = data.get('content_id')
+        copy_type = data.get('copy_type', 'general')  # 'prompt', 'title', 'tags', etc.
+        
+        if content_id:
+            # Update content copy metrics
+            content = GeneratedContent.query.get(content_id)
+            if content:
+                content.copy_count += 1
+                content.last_copied = datetime.utcnow()
+                
+                # Update concept copy metrics if linked
+                if content.concept_id:
+                    concept = Concept.query.get(content.concept_id)
+                    if concept:
+                        concept.total_copies += 1
+                
+                db.session.commit()
+                
+                # Track analytics event
+                track_analytics_event('copy', 
+                                    content_id=content_id, 
+                                    concept_id=content.concept_id,
+                                    event_data={'copy_type': copy_type})
+        
+        return jsonify({'status': 'success'})
+    
+    except Exception as e:
+        app.logger.error(f"Error tracking copy event: {str(e)}")
+        return jsonify({'error': 'Failed to track copy event'}), 500
+
+@app.route('/api/stats')
+def api_stats():
+    """API endpoint to get comprehensive usage statistics"""
+    try:
+        from models import GeneratedContent, Concept, AnalyticsEvent
+        from sqlalchemy import func, desc
+        
+        # Basic counts
         total_generations = GeneratedContent.query.count()
         unique_concepts = Concept.query.count()
+        total_views = db.session.query(func.sum(GeneratedContent.view_count)).scalar() or 0
+        total_copies = db.session.query(func.sum(GeneratedContent.copy_count)).scalar() or 0
+        
+        # Most popular concepts by usage
         most_popular_concepts = Concept.query.order_by(
             Concept.usage_count.desc()
         ).limit(5).all()
         
+        # Most viewed content
+        most_viewed_content = GeneratedContent.query.order_by(
+            GeneratedContent.view_count.desc()
+        ).limit(5).all()
+        
+        # Most copied content
+        most_copied_content = GeneratedContent.query.order_by(
+            GeneratedContent.copy_count.desc()
+        ).limit(5).all()
+        
+        # Recent activity
         recent_activity = GeneratedContent.query.order_by(
             GeneratedContent.created_at.desc()
         ).limit(10).all()
         
+        # Analytics events summary (last 30 days)
+        thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+        recent_events = db.session.query(
+            AnalyticsEvent.event_type,
+            func.count(AnalyticsEvent.id).label('count')
+        ).filter(
+            AnalyticsEvent.created_at >= thirty_days_ago
+        ).group_by(AnalyticsEvent.event_type).all()
+        
         return jsonify({
-            'total_generations': total_generations,
-            'unique_concepts': unique_concepts,
-            'most_popular_concepts': [
-                {'text': c.text, 'usage_count': c.usage_count} 
+            'overview': {
+                'total_generations': total_generations,
+                'unique_concepts': unique_concepts,
+                'total_views': total_views,
+                'total_copies': total_copies
+            },
+            'popular_concepts': [
+                {
+                    'text': c.text,
+                    'usage_count': c.usage_count,
+                    'total_views': c.total_views,
+                    'total_copies': c.total_copies
+                } 
                 for c in most_popular_concepts
             ],
+            'top_performing_content': {
+                'most_viewed': [
+                    {
+                        'id': c.id,
+                        'concept': c.concept,
+                        'view_count': c.view_count,
+                        'copy_count': c.copy_count,
+                        'created_at': c.created_at.isoformat()
+                    }
+                    for c in most_viewed_content
+                ],
+                'most_copied': [
+                    {
+                        'id': c.id,
+                        'concept': c.concept,
+                        'view_count': c.view_count,
+                        'copy_count': c.copy_count,
+                        'created_at': c.created_at.isoformat()
+                    }
+                    for c in most_copied_content
+                ]
+            },
             'recent_activity': [
-                {'id': r.id, 'concept': r.concept, 'created_at': r.created_at.isoformat()}
+                {
+                    'id': r.id,
+                    'concept': r.concept,
+                    'view_count': r.view_count,
+                    'copy_count': r.copy_count,
+                    'created_at': r.created_at.isoformat()
+                }
                 for r in recent_activity
-            ]
+            ],
+            'event_summary': {
+                event_type: count for event_type, count in recent_events
+            }
         })
     
     except Exception as e:
