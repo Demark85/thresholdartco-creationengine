@@ -4,7 +4,7 @@
 
 This is a Flask-based web application designed to help artists and creators generate MidJourney prompts and Etsy listings from creative concepts. The application takes user input describing a creative concept and transforms it into multiple MidJourney prompts with different artistic styles, lighting, and technical parameters.
 
-**Current Status**: Fully functional prototype deployed and tested successfully (July 28, 2025)
+**Current Status**: Fully functional application with complete analytics tracking deployed and tested successfully (July 28, 2025)
 
 ## User Preferences
 
@@ -36,19 +36,21 @@ Preferred communication style: Simple, everyday language.
 ## Key Components
 
 ### Core Application Logic
-- **main.py**: Primary Flask application with route handlers, database integration, and prompt generation logic
-- **models.py**: SQLAlchemy database models for GeneratedContent and Concept entities
+- **main.py**: Primary Flask application with route handlers, database integration, analytics tracking, and prompt generation logic
+- **models.py**: SQLAlchemy database models for GeneratedContent, Concept, and AnalyticsEvent entities
 - **Prompt Generator**: Algorithm that combines creative concepts with artistic styles, lighting conditions, and technical parameters to create MidJourney prompts
 
 ### Frontend Components
-- **index.html**: Main input form for creative concepts with navigation to history
-- **results.html**: Display page for generated MidJourney prompts with copy-to-clipboard functionality
+- **index.html**: Main input form for creative concepts with navigation to history and analytics
+- **results.html**: Display page for generated MidJourney prompts with copy-to-clipboard functionality and performance metrics
 - **history.html**: List view of all previously generated content with statistics
-- **script.js**: Client-side JavaScript for clipboard operations and UI feedback
+- **analytics.html**: Comprehensive analytics dashboard showing performance insights and trends
+- **script.js**: Client-side JavaScript for clipboard operations, analytics event tracking, and UI feedback
 
 ### Database Schema
-- **GeneratedContent**: Stores all generated prompts, titles, tags, descriptions, and Pinterest captions
-- **Concept**: Tracks unique creative concepts with usage statistics and timestamps
+- **GeneratedContent**: Stores all generated prompts, titles, tags, descriptions, Pinterest captions, and performance metrics (views, copies)
+- **Concept**: Tracks unique creative concepts with usage statistics, timestamps, and aggregate performance data
+- **AnalyticsEvent**: Logs detailed user interaction events for comprehensive performance analysis
 
 ### Styling and UI
 - **Bootstrap 5**: Responsive grid system and component styling
