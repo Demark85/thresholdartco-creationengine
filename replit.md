@@ -26,20 +26,29 @@ Preferred communication style: Simple, everyday language.
 - **Environment Configuration**: Environment variables for sensitive data
 
 ### Data Storage Solutions
-- **Current State**: No persistent data storage implemented
+- **Database**: PostgreSQL database for persistent storage
+- **Models**: SQLAlchemy ORM with GeneratedContent and Concept models
+- **Data Persistence**: All generated content automatically saved with timestamps
+- **Analytics**: Concept usage tracking and statistics
 - **Session Data**: In-memory session storage via Flask sessions
 - **Static Assets**: Served via Flask's static file handling
 
 ## Key Components
 
 ### Core Application Logic
-- **main.py**: Primary Flask application with route handlers and prompt generation logic
+- **main.py**: Primary Flask application with route handlers, database integration, and prompt generation logic
+- **models.py**: SQLAlchemy database models for GeneratedContent and Concept entities
 - **Prompt Generator**: Algorithm that combines creative concepts with artistic styles, lighting conditions, and technical parameters to create MidJourney prompts
 
 ### Frontend Components
-- **index.html**: Main input form for creative concepts
+- **index.html**: Main input form for creative concepts with navigation to history
 - **results.html**: Display page for generated MidJourney prompts with copy-to-clipboard functionality
+- **history.html**: List view of all previously generated content with statistics
 - **script.js**: Client-side JavaScript for clipboard operations and UI feedback
+
+### Database Schema
+- **GeneratedContent**: Stores all generated prompts, titles, tags, descriptions, and Pinterest captions
+- **Concept**: Tracks unique creative concepts with usage statistics and timestamps
 
 ### Styling and UI
 - **Bootstrap 5**: Responsive grid system and component styling
@@ -52,8 +61,12 @@ Preferred communication style: Simple, everyday language.
 2. **Form Submission**: POST request to `/generate` endpoint with concept data
 3. **Prompt Generation**: Backend processes concept through generation algorithm
 4. **Content Creation**: Multiple MidJourney prompts created with varied styles and parameters
-5. **Results Display**: Generated prompts displayed on results page with copy functionality
-6. **User Interaction**: Users can copy individual prompts to clipboard for use in MidJourney
+5. **Database Storage**: All generated content automatically saved to PostgreSQL database
+6. **Concept Tracking**: Creative concepts tracked for usage analytics and statistics
+7. **Results Display**: Generated prompts displayed on results page with copy functionality
+8. **Content History**: Users can access previously generated content via history page
+9. **Individual Viewing**: Each generated content item can be viewed by unique ID
+10. **User Interaction**: Users can copy individual prompts to clipboard for use in MidJourney
 
 ## External Dependencies
 
@@ -64,6 +77,8 @@ Preferred communication style: Simple, everyday language.
 
 ### Python Dependencies
 - **Flask**: Web framework for Python
+- **Flask-SQLAlchemy**: ORM for database interactions
+- **psycopg2-binary**: PostgreSQL adapter for Python
 - **Standard Library**: Uses built-in modules (os, logging, random) for core functionality
 
 ### Browser APIs
@@ -91,11 +106,23 @@ Preferred communication style: Simple, everyday language.
 - **XSS Protection**: Jinja2 template auto-escaping enabled
 - **Environment Variables**: Sensitive configuration externalized
 
+## Recent Changes (July 28, 2025)
+
+### Database Integration Implementation
+- **PostgreSQL Integration**: Added full database support with Flask-SQLAlchemy
+- **Data Models**: Created GeneratedContent and Concept models with proper relationships
+- **Content Persistence**: All generated prompts, titles, tags, and descriptions now automatically saved
+- **History Functionality**: Added `/history` route to view all past generations
+- **Individual Content Viewing**: Added `/view/<id>` route for accessing specific saved content
+- **Usage Analytics**: Concept tracking with usage statistics and timestamps
+- **Navigation Enhancement**: Added history links throughout the application
+- **API Endpoint**: Created `/api/stats` for retrieving usage statistics
+
 ## Future Enhancement Opportunities
 
-- Database integration for saving generated prompts
-- User authentication and prompt history
-- Etsy listing generation (referenced in templates but not implemented)
-- API endpoints for programmatic access
-- Enhanced prompt generation algorithms
+- User authentication and personalized prompt history
+- Enhanced prompt generation algorithms with machine learning
 - Image preview integration with MidJourney API
+- Bulk export functionality for generated content
+- Advanced search and filtering in history
+- User preferences and customizable generation settings
