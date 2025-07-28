@@ -26,25 +26,35 @@ Preferred communication style: Simple, everyday language.
 - **Environment Configuration**: Environment variables for sensitive data
 
 ### Data Storage Solutions
-- **Current State**: No persistent data storage implemented
+- **Database**: PostgreSQL with Flask-SQLAlchemy ORM
+- **Models**: GeneratedContent and Concept models with proper foreign key relationships
+- **Features**: Content history, concept tracking, usage analytics
 - **Session Data**: In-memory session storage via Flask sessions
 - **Static Assets**: Served via Flask's static file handling
 
 ## Key Components
 
 ### Core Application Logic
-- **main.py**: Primary Flask application with route handlers and prompt generation logic
+- **main.py**: Primary Flask application with route handlers, prompt generation logic, and database integration
+- **models.py**: SQLAlchemy models for GeneratedContent and Concept with proper relationships
 - **Prompt Generator**: Algorithm that combines creative concepts with artistic styles, lighting conditions, and technical parameters to create MidJourney prompts
 
 ### Frontend Components
-- **index.html**: Main input form for creative concepts
+- **index.html**: Main input form for creative concepts with navigation to history
 - **results.html**: Display page for generated MidJourney prompts with copy-to-clipboard functionality
+- **history.html**: List view of all previously generated content with statistics
 - **script.js**: Client-side JavaScript for clipboard operations and UI feedback
+
+### Database Components
+- **GeneratedContent Model**: Stores all generated prompts, titles, tags, descriptions, and captions
+- **Concept Model**: Tracks unique creative concepts with usage statistics and timestamps
+- **Relationships**: Foreign key linking content to concepts for analytics
 
 ### Styling and UI
 - **Bootstrap 5**: Responsive grid system and component styling
 - **Dark Theme**: Consistent dark color scheme throughout the application
 - **Interactive Elements**: Copy buttons with visual feedback and toast notifications
+- **Navigation**: Seamless movement between creation, viewing, and history pages
 
 ## Data Flow
 
