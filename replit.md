@@ -4,6 +4,8 @@
 
 This is a Flask-based web application designed to help artists and creators generate MidJourney prompts and Etsy listings from creative concepts. The application takes user input describing a creative concept and transforms it into multiple MidJourney prompts with different artistic styles, lighting, and technical parameters.
 
+**Current Status**: Fully functional prototype deployed and tested successfully (July 28, 2025)
+
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
